@@ -5866,7 +5866,7 @@
 					}
 				],
 				"url": {
-					"raw": "{{protocol}}://{{host}}:{{port}}/api/v1/models/c_tax?$filter=created eq '2003-01-08T15:06:11'&$select=name,created",
+					"raw": "{{protocol}}://{{host}}:{{port}}/api/v1/models/c_tax?$filter=created eq '2003-01-08T15:06:11Z'&$select=name,created",
 					"protocol": "{{protocol}}",
 					"host": [
 						"{{host}}"
@@ -5881,7 +5881,7 @@
 					"query": [
 						{
 							"key": "$filter",
-							"value": "created eq '2003-01-08T15:06:11'"
+							"value": "created eq '2003-01-08T15:06:11Z'"
 						},
 						{
 							"key": "$select",

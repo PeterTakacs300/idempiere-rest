@@ -4723,6 +4723,7 @@ paths:
           schema:
             type: integer
             default: 0
+            minimum: 0
           description: 'lifetime of the presigned URL in seconds (0 = use server default; capped by REST_PRESIGNED_URL_MAX_EXPIRE_SECONDS)'
       responses:
         '200':
@@ -7855,6 +7856,7 @@ paths:
           schema:
             type: integer
             default: 0
+            minimum: 0
           description: 'lifetime of the presigned URL in seconds (0 = use server default; capped by REST_PRESIGNED_URL_MAX_EXPIRE_SECONDS)'
       responses:
         '200':

@@ -965,7 +965,7 @@ public class ModelResourceImpl implements ModelResource {
 				if (archive.getAD_Process_ID() > 0)
 					entryJsonObject.addProperty("processId", archive.getAD_Process_ID());
 				if (archive.getCreated() != null)
-					entryJsonObject.addProperty("created", archive.getCreated().toString());
+					entryJsonObject.addProperty("created", archive.getCreated().toInstant().toString());
 				array.add(entryJsonObject);
 			}
 			JsonObject json = new JsonObject();
@@ -999,6 +999,12 @@ public class ModelResourceImpl implements ModelResource {
 					int maxExpire = MSysConfig.getIntValue(REST_PRESIGNED_URL_MAX_EXPIRE_SECONDS, 3600);
 					if (expiresInSeconds <= 0 || expiresInSeconds > maxExpire)
 						expiresInSeconds = maxExpire;
+					String nativeUrl = archive.getPresignedURL(expiresInSeconds);
+					if (nativeUrl != null) {
+						JsonObject json = new JsonObject();
+						json.addProperty("url", nativeUrl);
+						return Response.ok(json.toString(), "application/json").build();
+					}
 					String archivePrefix = useRestView ? "v1/views/" : "v1/models/";
 					String archivePath = archivePrefix + originalTableName + "/" + id + "/archives/" + archiveId;
 					String presignedURLParams = PresignedURL.createPresignedURLParams("GET", archivePath, expiresInSeconds);
