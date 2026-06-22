@@ -995,14 +995,17 @@ public class ModelResourceImpl implements ModelResource {
 					.setParameters(archiveId, po.get_Table_ID(), po.get_ID())
 					.first();
 			if (archive != null) {
-				if ("true".equalsIgnoreCase(presign)) {
+				if ("true".equalsIgnoreCase(presign) || "auto".equalsIgnoreCase(presign)
+						|| "storage".equalsIgnoreCase(presign) || "idempiere".equalsIgnoreCase(presign)) {
 					int maxExpire = MSysConfig.getIntValue(REST_PRESIGNED_URL_MAX_EXPIRE_SECONDS, 3600);
 					if (expiresInSeconds <= 0 || expiresInSeconds > maxExpire)
 						expiresInSeconds = maxExpire;
-					String nativeUrl = archive.getPresignedURL(expiresInSeconds);
+					boolean preferIdempiere = "idempiere".equalsIgnoreCase(presign);
+					String nativeUrl = preferIdempiere ? null : archive.getPresignedURL(expiresInSeconds);
 					if (nativeUrl != null) {
 						JsonObject json = new JsonObject();
 						json.addProperty("url", nativeUrl);
+						json.addProperty("via", "storage");
 						return Response.ok(json.toString(), "application/json").build();
 					}
 					String archivePrefix = useRestView ? "v1/views/" : "v1/models/";
@@ -1011,6 +1014,7 @@ public class ModelResourceImpl implements ModelResource {
 					String baseUrl = uriInfo.getBaseUri().toString();
 					JsonObject json = new JsonObject();
 					json.addProperty("url", baseUrl + archivePath + presignedURLParams);
+					json.addProperty("via", "idempiere");
 					return Response.ok(json.toString(), "application/json").build();
 				}
 				byte[] binaryData = archive.getBinaryData();
