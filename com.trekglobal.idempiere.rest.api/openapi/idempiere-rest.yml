@@ -4743,12 +4743,14 @@ paths:
               schema:
                 oneOf:
                   - type: object
+                    required: [data]
                     properties:
                       data:
                         type: string
                         format: byte
                         description: base64 encoded archive content
                   - type: object
+                    required: [url, via]
                     properties:
                       url:
                         type: string
@@ -7887,12 +7889,14 @@ paths:
               schema:
                 oneOf:
                   - type: object
+                    required: [data]
                     properties:
                       data:
                         type: string
                         format: byte
                         description: base64 encoded archive content
                   - type: object
+                    required: [url, via]
                     properties:
                       url:
                         type: string

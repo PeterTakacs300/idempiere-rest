@@ -143,6 +143,11 @@ public class ModelResourceImpl implements ModelResource {
 		useRestView = true;
 		return this;
 	}
+
+	protected ModelResourceImpl withUriInfo(UriInfo uriInfo) {
+		this.uriInfo = uriInfo;
+		return this;
+	}
 	
 	public Response getPO(String tableName, String id, String details, String select, String showsql) {
 		return getPO(tableName, id, details, select, null, showsql, null);
