@@ -212,8 +212,8 @@ public class ViewResourceImpl implements ViewResource {
 	}
 
 	@Override
-	public Response getAttachmentEntry(String tableName, String id, String fileName, String asJson) {
-		return restView().getAttachmentEntry(tableName, id, fileName, asJson);
+	public Response getAttachmentEntry(String tableName, String id, String fileName, String asJson, String presign, long expiresInSeconds) {
+		return restView().getAttachmentEntry(tableName, id, fileName, asJson, presign, expiresInSeconds);
 	}
 
 	@Override

@@ -1179,7 +1179,8 @@ public class ModelResourceImpl implements ModelResource {
 	}
 
 	@Override
-	public Response getAttachmentEntry(String tableName, String id, String fileName, String asJson) {	
+	public Response getAttachmentEntry(String tableName, String id, String fileName, String asJson, String presign, long expiresInSeconds) {
+		String originalTableName = tableName;
 		MRestView view = null;
 		if (useRestView) {
 			view = RestUtils.getView(tableName);
@@ -1188,14 +1189,40 @@ public class ModelResourceImpl implements ModelResource {
 			else
 				return ResponseUtils.getResponseErrorFromException(new IDempiereRestException("Invalid rest view name", "No match found for rest view name: " + tableName, Status.NOT_FOUND), "Not found");
 		}
-		
+
 		POParser poParser = new POParser(tableName, id, true, false);
 		if (poParser.isValidPO()) {
 			PO po = poParser.getPO();
 			MAttachment attachment = po.getAttachment();
 			if (attachment != null) {
-				for(MAttachmentEntry entry : attachment.getEntries()) {
+				MAttachmentEntry[] entries = attachment.getEntries();
+				for (int i = 0; i < entries.length; i++) {
+					MAttachmentEntry entry = entries[i];
 					if (entry.getName().equals(fileName)) {
+						if ("true".equalsIgnoreCase(presign) || "auto".equalsIgnoreCase(presign)
+								|| "storage".equalsIgnoreCase(presign) || "idempiere".equalsIgnoreCase(presign)) {
+							int maxExpire = MSysConfig.getIntValue(REST_PRESIGNED_URL_MAX_EXPIRE_SECONDS, 3600);
+							if (expiresInSeconds <= 0 || expiresInSeconds > maxExpire)
+								expiresInSeconds = maxExpire;
+							boolean preferIdempiere = "idempiere".equalsIgnoreCase(presign);
+							String nativeUrl = preferIdempiere ? null : attachment.getPresignedURL(i, expiresInSeconds);
+							if (nativeUrl != null) {
+								JsonObject json = new JsonObject();
+								json.addProperty("url", nativeUrl);
+								json.addProperty("via", "storage");
+								return Response.ok(json.toString(), "application/json").build();
+							}
+							String attachmentPrefix = useRestView ? "v1/views/" : "v1/models/";
+							String attachmentPath = attachmentPrefix + originalTableName + "/" + id + "/attachments/" + fileName;
+							String presignedURLParams = PresignedURL.createPresignedURLParams("GET", attachmentPath, expiresInSeconds);
+							String baseUrl = uriInfo.getBaseUri().toString();
+							String encodedFileName = java.net.URLEncoder.encode(fileName, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20");
+							String encodedAttachmentPath = attachmentPrefix + originalTableName + "/" + id + "/attachments/" + encodedFileName;
+							JsonObject json = new JsonObject();
+							json.addProperty("url", baseUrl + encodedAttachmentPath + presignedURLParams);
+							json.addProperty("via", "idempiere");
+							return Response.ok(json.toString(), "application/json").build();
+						}
 						try {
 							Path tempPath = Files.createTempDirectory(tableName);
 							File tempFolder = tempPath.toFile();
