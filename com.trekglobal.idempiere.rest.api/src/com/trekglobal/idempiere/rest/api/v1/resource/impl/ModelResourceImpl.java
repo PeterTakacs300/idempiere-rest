@@ -180,7 +180,8 @@ public class ModelResourceImpl implements ModelResource {
 					throw new IDempiereRestException("Invalid rest view name", "No match found for rest view name: " + tableName, Status.NOT_FOUND);
 			}
 			
-			RestUtils.getTableAndCheckAccess(tableName, false);
+			//	Normalize to AD_Table.TableName as the model class lookup is case sensitive
+			tableName = RestUtils.getTableAndCheckAccess(tableName, false).getTableName();
 
 			String[] includes = null;
 			if (!Util.isEmpty(multiProperty, true)) {
@@ -358,7 +359,8 @@ public class ModelResourceImpl implements ModelResource {
 					throw new IDempiereRestException("Invalid rest view name", "No match found for rest view name: " + tableName, Status.NOT_FOUND);
 			}
 			
-			RestUtils.getTableAndCheckAccess(tableName, false);
+			//	Normalize to AD_Table.TableName as the model class lookup is case sensitive
+			tableName = RestUtils.getTableAndCheckAccess(tableName, false).getTableName();
 			ModelHelper modelHelper = new ModelHelper(tableName, filter, order, top, skip, validationRuleID, context, label);
 			if (view != null && !Util.isEmpty(select, true)) {
 				select = toColumnNames(view, select);
@@ -449,13 +451,15 @@ public class ModelResourceImpl implements ModelResource {
 			}
 			
 			MTable table = RestUtils.getTableAndCheckAccess(tableName, true);
+			//	Normalize to AD_Table.TableName as the model class lookup is case sensitive
+			tableName = table.getTableName();
 
 			if (threadLocalTrxName == null)
 				trx.start();
 			Gson gson = new GsonBuilder().create();
 			JsonObject jsonObject = gson.fromJson(jsonText, JsonObject.class);
 			IPOSerializer serializer = IPOSerializer.getPOSerializer(tableName, MTable.getClass(tableName));
-			PO po = serializer.fromJson(jsonObject, table, view);
+			PO po = serializer.fromJson(jsonObject, table, view, trx.getTrxName());
 			if (po.getAD_Client_ID() != Env.getAD_Client_ID(Env.getCtx())) {
 				log.log(Level.SEVERE, "Tenant " + Env.getAD_Client_ID(Env.getCtx()) + " attempt to create record for tenant: " + po.getAD_Client_ID(), 
 						new CrossTenantException(true, po.get_TableName(), -1));
@@ -515,7 +519,7 @@ public class ModelResourceImpl implements ModelResource {
 			if (threadLocalTrxName == null)
 				trx.commit(true);
 			po.load(trx.getTrxName());
-			jsonObject = serializer.toJson(po, view);
+			jsonObject = serializer.toJson(po, view, trx.getTrxName());
 			if (processMsg.length() > 0)
 				jsonObject.addProperty("doc-processmsg", processMsg.toString());
 			if (detailMap.size() > 0) {
@@ -574,6 +578,8 @@ public class ModelResourceImpl implements ModelResource {
 			}
 
 			if (childTable != null && childTable.getAD_Table_ID() > 0) {
+				//	Normalize to AD_Table.TableName as the model class lookup is case sensitive
+				childTableName = childTable.getTableName();
 				IPOSerializer childSerializer = IPOSerializer.getPOSerializer(childTableName, MTable.getClass(childTableName));
 				JsonArray fieldArray = fieldElement.getAsJsonArray();
 				JsonArray savedArray = new JsonArray();
@@ -582,7 +588,7 @@ public class ModelResourceImpl implements ModelResource {
 					fieldArray.forEach(e -> {
 						if (e.isJsonObject()) {
 							JsonObject childJsonObject = e.getAsJsonObject();
-							PO childPO = childSerializer.fromJson(childJsonObject, childTable, finalChildView);
+							PO childPO = childSerializer.fromJson(childJsonObject, childTable, finalChildView, trx.getTrxName());
 							if (!RestUtils.hasRoleUpdateAccess(childPO.getAD_Client_ID(), childPO.getAD_Org_ID(), childPO.get_Table_ID(), 0, true))
 								throw new AdempiereException("AccessCannotUpdate");
 							
@@ -614,7 +620,7 @@ public class ModelResourceImpl implements ModelResource {
 								EventManager.getInstance().unregister(eventHandler);
 							}
 							fireRestSaveEvent(childPO, PO_AFTER_REST_SAVE, true);
-							childJsonObject = childSerializer.toJson(childPO, finalChildView);
+							childJsonObject = childSerializer.toJson(childPO, finalChildView, trx.getTrxName());
 							JsonObject newChildJsonObject = e.getAsJsonObject();
 							Map<String, JsonArray> childDetailMap = new LinkedHashMap<>();
 							Set<String> fields = newChildJsonObject.keySet();
@@ -685,8 +691,11 @@ public class ModelResourceImpl implements ModelResource {
 				trx.start();
 			Gson gson = new GsonBuilder().create();
 			JsonObject jsonObject = gson.fromJson(jsonText, JsonObject.class);
-			IPOSerializer serializer = IPOSerializer.getPOSerializer(tableName, MTable.getClass(tableName));
-			po = serializer.fromJson(jsonObject, po, view);			
+			//	Normalize to AD_Table.TableName as the model class lookup is case sensitive.
+			//	tableName is captured by a lambda below, so a separate local is used here.
+			String modelTableName = po.get_TableName();
+			IPOSerializer serializer = IPOSerializer.getPOSerializer(modelTableName, MTable.getClass(modelTableName));
+			po = serializer.fromJson(jsonObject, po, view, trx.getTrxName());			
 			po.set_TrxName(trx.getTrxName());
 
 			// Event handler for mandatory fields validation
@@ -746,8 +755,10 @@ public class ModelResourceImpl implements ModelResource {
 						if (childView == null)
 							continue;
 					}
-					String childTableName = childView != null ? MTable.getTableName(Env.getCtx(), childView.getAD_Table_ID()) : field;
-					MTable childTable = MTable.get(Env.getCtx(), childTableName);
+					String requestedChildTableName = childView != null ? MTable.getTableName(Env.getCtx(), childView.getAD_Table_ID()) : field;
+					MTable childTable = MTable.get(Env.getCtx(), requestedChildTableName);
+					//	Normalize to AD_Table.TableName as the model class lookup is case sensitive
+					String childTableName = childTable != null ? childTable.getTableName() : requestedChildTableName;
 					if (!RestUtils.isValidDetailTable(childTable, RestUtils.getKeyColumnName(po.get_TableName()))) {
 						throw new IDempiereRestException("Wrong detail", "Cannot create/update detail records for the table because it has no column that links to the parent table: " + childTableName, Status.INTERNAL_SERVER_ERROR);
 					}
@@ -768,10 +779,10 @@ public class ModelResourceImpl implements ModelResource {
 										throw new IDempiereRestException("Delete Error", "Cannot delete non-existing record", Status.NOT_FOUND);
 									
 									if (childPO == null) {
-										childPO = childSerializer.fromJson(childJsonObject, childTable, finalChildView);
+										childPO = childSerializer.fromJson(childJsonObject, childTable, finalChildView, trx.getTrxName());
 										childPO.set_ValueOfColumn(RestUtils.getKeyColumnName(tableName), parentId);
 									} else  if (!delete){
-										childPO = childSerializer.fromJson(childJsonObject, childPO, finalChildView);
+										childPO = childSerializer.fromJson(childJsonObject, childPO, finalChildView, trx.getTrxName());
 									}
 									childPO.set_TrxName(trx.getTrxName());
 									if (delete) {
@@ -804,7 +815,7 @@ public class ModelResourceImpl implements ModelResource {
 											EventManager.getInstance().unregister(childEventHandler);
 										}
 										fireRestSaveEvent(childPO, PO_AFTER_REST_SAVE, false);
-										childJsonObject = serializer.toJson(childPO, finalChildView);
+										childJsonObject = serializer.toJson(childPO, finalChildView, trx.getTrxName());
 										savedArray.add(childJsonObject);
 									}									
 								}
@@ -836,7 +847,7 @@ public class ModelResourceImpl implements ModelResource {
 			}
 			
 			po.load(trx.getTrxName());
-			jsonObject = serializer.toJson(po, view);
+			jsonObject = serializer.toJson(po, view, trx.getTrxName());
 			if (processMsg.length() > 0)
 				jsonObject.addProperty("doc-processmsg", processMsg.toString());
 			if (detailMap.size() > 0) {
@@ -1013,7 +1024,7 @@ public class ModelResourceImpl implements ModelResource {
 						json.addProperty("via", "storage");
 						return Response.ok(json.toString(), "application/json").build();
 					}
-					String archivePrefix = useRestView ? "v1/views/" : "v1/models/";
+					String archivePrefix = useRestView ? "v1/views/" : "v1/models/"; // no leading slash - same pattern as UploadResourceImpl
 					String archivePath = archivePrefix + originalTableName + "/" + id + "/archives/" + archiveId;
 					String presignedURLParams = PresignedURL.createPresignedURLParams("GET", archivePath, expiresInSeconds);
 					String baseUrl = uriInfo.getBaseUri().toString();

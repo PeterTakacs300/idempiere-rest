@@ -48,7 +48,6 @@ import com.google.gson.JsonPrimitive;
 
 import com.trekglobal.idempiere.rest.api.model.MRestView;
 import com.trekglobal.idempiere.rest.api.model.MRestViewColumn;
-import com.trekglobal.idempiere.rest.api.util.ThreadLocalTrx;
 
 /**
  * json type converter for C_Location
@@ -66,19 +65,29 @@ public class LocationTypeConverter implements ITypeConverter<Object> {
 
 	@Override
 	public Object toJsonValue(MColumn column, Object value) {
-		return toJsonValue(column, value, null);
+		return toJsonValue(column, value, (MRestView)null, (String)null);
 	}
-	
+
 	@Override
 	public Object toJsonValue(MColumn column, Object value, MRestView referenceView) {
+		return toJsonValue(column, value, referenceView, (String)null);
+	}
+
+	@Override
+	public Object toJsonValue(MColumn column, Object value, MRestView referenceView, String trxName) {
 		String label = Msg.getElement(Env.getCtx(), column.getColumnName());
 		Lookup lookup = new MLocationLookup(Env.getCtx(), 0);
-		return toJsonValue(column.getAD_Reference_ID(), label, lookup, column.getReferenceTableName(), value, referenceView);
+		return toJsonValue(column.getAD_Reference_ID(), label, lookup, column.getReferenceTableName(), value, referenceView, trxName);
 	}
 
 	@Override
 	public Object toJsonValue(GridField field, Object value) {
-		return toJsonValue(field.getDisplayType(), field.getHeader(), field.getLookup(), getReferenceTableNameFromField(field), value, null);
+		return toJsonValue(field, value, (String)null);
+	}
+
+	@Override
+	public Object toJsonValue(GridField field, Object value, String trxName) {
+		return toJsonValue(field.getDisplayType(), field.getHeader(), field.getLookup(), getReferenceTableNameFromField(field), value, null, trxName);
 	}
 	
 	private String getReferenceTableNameFromField(GridField field) {
@@ -95,9 +104,9 @@ public class LocationTypeConverter implements ITypeConverter<Object> {
 		return refTableName;
 	}
 	
-	private Object toJsonValue(int displayType, String label, Lookup lookup, String refTableName, Object value, MRestView referenceView) {
+	private Object toJsonValue(int displayType, String label, Lookup lookup, String refTableName, Object value, MRestView referenceView, String trxName) {
 		if (lookup != null && value != null && value instanceof Integer) {
-			MLocation loc = MLocation.get((Integer)value);
+			MLocation loc = new MLocation(Env.getCtx(), (Integer)value, trxName);
 			JsonObject ref = new JsonObject();
 			if (referenceView == null)
 				ref.addProperty("propertyLabel", label);
@@ -105,7 +114,7 @@ public class LocationTypeConverter implements ITypeConverter<Object> {
 				ref.addProperty("id", ((Number)value).intValue());
 			else
 				ref.addProperty("id", value.toString());
-			String display = lookup.getDisplay(value);
+			String display = TypeConverterUtils.getIdentifier(lookup, value, trxName);
 			if (!Util.isEmpty(display, true)) {
 				ref.addProperty("identifier", display);
 			}							
@@ -118,33 +127,35 @@ public class LocationTypeConverter implements ITypeConverter<Object> {
 			
 			MRestViewColumn[] viewColumns = referenceView != null ? referenceView.getColumns() : null;
 			int count = viewColumns != null ? viewColumns.length : columns.length;
-			for(int i = 0; i < count; i++) {
-				MColumn column = viewColumns != null ? MColumn.get(viewColumns[i].getAD_Column_ID()) : columns[i];
-				if(column.isKey())continue;
-				
-				columnName = column.getColumnName();
-				
-				if (columnName.endsWith("_ID")) {
-					if((columnValue = loc.get_Value(columnName))!=null) {
-						JsonObject refChild = new JsonObject();
-						if (viewColumns == null)
-							refChild.addProperty("propertyLabel",Msg.getElement(Env.getCtx(), columnName));
-						if (value instanceof Number)
-							refChild.addProperty("id", (Integer)columnValue);
-						else
-							refChild.addProperty("id", value.toString());
-						String displayValue = getColumnLookup(column).getDisplay(columnValue);
-						if(displayValue!=null)
-							refChild.addProperty("identifier",displayValue);
-						if (viewColumns != null && viewColumns[i].getREST_ReferenceView_ID() > 0)
-							refChild.addProperty("view-name", MRestView.get(viewColumns[i].getREST_ReferenceView_ID()).getName());
-						else
-							refChild.addProperty("model-name", MTable.get(Env.getCtx(), columnName.replace("_ID", "")).getTableName().toLowerCase());
-						ref.add(viewColumns != null ? viewColumns[i].getName() : columnName, refChild);
-					}
-				} else {
-					if((columnValue = loc.get_Value(columnName))!=null) {
-						ref.addProperty(viewColumns != null ? viewColumns[i].getName() : columnName, columnValue.toString());
+			if (loc != null && loc.get_ID() > 0) {
+				for(int i = 0; i < count; i++) {
+					MColumn column = viewColumns != null ? MColumn.get(viewColumns[i].getAD_Column_ID()) : columns[i];
+					if(column.isKey())continue;
+					
+					columnName = column.getColumnName();
+					
+					if (columnName.endsWith("_ID")) {
+						if((columnValue = loc.get_Value(columnName))!=null) {
+							JsonObject refChild = new JsonObject();
+							if (viewColumns == null)
+								refChild.addProperty("propertyLabel",Msg.getElement(Env.getCtx(), columnName));
+							if (value instanceof Number)
+								refChild.addProperty("id", (Integer)columnValue);
+							else
+								refChild.addProperty("id", value.toString());
+							String displayValue = TypeConverterUtils.getIdentifier(getColumnLookup(column), columnValue, trxName);
+							if(displayValue!=null)
+								refChild.addProperty("identifier",displayValue);
+							if (viewColumns != null && viewColumns[i].getREST_ReferenceView_ID() > 0)
+								refChild.addProperty("view-name", MRestView.get(viewColumns[i].getREST_ReferenceView_ID()).getName());
+							else
+								refChild.addProperty("model-name", MTable.get(Env.getCtx(), columnName.replace("_ID", "")).getTableName().toLowerCase());
+							ref.add(viewColumns != null ? viewColumns[i].getName() : columnName, refChild);
+						}
+					} else {
+						if((columnValue = loc.get_Value(columnName))!=null) {
+							ref.addProperty(viewColumns != null ? viewColumns[i].getName() : columnName, columnValue.toString());
+						}
 					}
 				}
 			}
@@ -156,24 +167,38 @@ public class LocationTypeConverter implements ITypeConverter<Object> {
 		
 	@Override
 	public Object fromJsonValue(GridField field, JsonElement value) {
-		return fromJson(value);
+		return fromJsonValue(field, value, (String)null);
+	}
+
+	@Override
+	public Object fromJsonValue(GridField field, JsonElement value, String trxName) {
+		return fromJson(value, null, trxName);
 	}
 
 	@Override
 	public Object fromJsonValue(MColumn column, JsonElement value) {
-		return fromJsonValue(column, value, null);
+		return fromJsonValue(column, value, (MRestView)null, (String)null);
 	}
-	
+
 	@Override
 	public Object fromJsonValue(MColumn column, JsonElement value, MRestView referenceView) {
-		return fromJson(value, referenceView);
+		return fromJsonValue(column, value, referenceView, (String)null);
 	}
-	
+
+	@Override
+	public Object fromJsonValue(MColumn column, JsonElement value, MRestView referenceView, String trxName) {
+		return fromJson(value, referenceView, trxName);
+	}
+
 	public Object fromJson(JsonElement element) {
-		return fromJson(element, null);
+		return fromJson(element, null, null);
 	}
-	
+
 	public Object fromJson(JsonElement element, MRestView referenceView) {
+		return fromJson(element, referenceView, null);
+	}
+
+	public Object fromJson(JsonElement element, MRestView referenceView, String trxName) {
 		if (element != null && element.isJsonObject()) {
 		
 			JsonObject json = element.getAsJsonObject();
@@ -187,7 +212,7 @@ public class LocationTypeConverter implements ITypeConverter<Object> {
 					C_Location_ID = 0;
 			}
 
-			MLocation po = new MLocation(Env.getCtx(), C_Location_ID, ThreadLocalTrx.getTrxName());
+			MLocation po = new MLocation(Env.getCtx(), C_Location_ID, trxName);
 
 			MTable table = MTable.get(Env.getCtx(), MLocation.Table_ID);
 			POInfo poInfo = POInfo.getPOInfo(Env.getCtx(), table.getAD_Table_ID());
