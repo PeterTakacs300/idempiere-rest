@@ -20,39 +20,40 @@
 * MA 02110-1301, USA.                                                 *
 *                                                                     *
 * Contributors:                                                       *
-* - Trek Global Corporation                                           *
-* - Murilo Torino                                                     *
+* - Diego Ruiz - bx-service                                           *
 **********************************************************************/
-package com.trekglobal.idempiere.rest.api.v1.resource.impl;
-
-import java.util.HashMap;
-import java.util.Map;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.Response;
-
-import com.trekglobal.idempiere.rest.api.v1.resource.WebhookInboundResource;
-import com.trekglobal.idempiere.rest.api.webhook.WebhookInboundHandler;
+package com.trekglobal.idempiere.rest.api.v1.auth;
 
 /**
- * Implementation of inbound webhook endpoint.
- * Delegates all logic to WebhookInboundHandler.
+ * Body of the first step of the code-based password reset (IDEMPIERE-7060):
+ * request that a one-time code be emailed to the given address. No tenant id is
+ * carried; the caller is pre-login and does not know it, so the endpoint uses
+ * client 0 (matching the ZK login panel).
  *
- * @author muriloht Murilo H. Torquato &lt;murilo@muriloht.com&gt;
+ * @author Diego Ruiz
  */
-public class WebhookInboundResourceImpl implements WebhookInboundResource {
+public class PasswordResetRequest {
 
-	@Override
-	public Response receiveWebhook(String endpointKey, String body, HttpHeaders headers, HttpServletRequest request) {
-		String remoteAddr = request != null ? request.getRemoteAddr() : null;
-		Map<String, String> queryParams = new HashMap<>();
-		if (request != null && request.getParameterMap() != null) {
-			for (Map.Entry<String, String[]> e : request.getParameterMap().entrySet()) {
-				if (e.getValue() != null && e.getValue().length > 0)
-					queryParams.put(e.getKey(), e.getValue()[0]);
-			}
-		}
-		return WebhookInboundHandler.handle(endpointKey, body, queryParams, headers, remoteAddr);
+	private String email;
+	private String language;
+
+	public PasswordResetRequest() {
 	}
+
+	public String getEmail() {
+		return email;
+	}
+
+	public void setEmail(String email) {
+		this.email = email;
+	}
+
+	public String getLanguage() {
+		return language;
+	}
+
+	public void setLanguage(String language) {
+		this.language = language;
+	}
+
 }

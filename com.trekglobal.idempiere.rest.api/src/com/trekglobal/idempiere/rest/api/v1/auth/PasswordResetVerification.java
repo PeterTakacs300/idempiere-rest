@@ -20,39 +20,39 @@
 * MA 02110-1301, USA.                                                 *
 *                                                                     *
 * Contributors:                                                       *
-* - Trek Global Corporation                                           *
-* - Murilo Torino                                                     *
+* - Diego Ruiz - bx-service                                           *
 **********************************************************************/
-package com.trekglobal.idempiere.rest.api.v1.resource.impl;
-
-import java.util.HashMap;
-import java.util.Map;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.Response;
-
-import com.trekglobal.idempiere.rest.api.v1.resource.WebhookInboundResource;
-import com.trekglobal.idempiere.rest.api.webhook.WebhookInboundHandler;
+package com.trekglobal.idempiere.rest.api.v1.auth;
 
 /**
- * Implementation of inbound webhook endpoint.
- * Delegates all logic to WebhookInboundHandler.
+ * Body of the second step of the code-based password reset (IDEMPIERE-7060):
+ * verify the one-time code emailed to the address. On success the service returns
+ * a short-lived verified token used by {@link PasswordResetCompletion}.
  *
- * @author muriloht Murilo H. Torquato &lt;murilo@muriloht.com&gt;
+ * @author Diego Ruiz
  */
-public class WebhookInboundResourceImpl implements WebhookInboundResource {
+public class PasswordResetVerification {
 
-	@Override
-	public Response receiveWebhook(String endpointKey, String body, HttpHeaders headers, HttpServletRequest request) {
-		String remoteAddr = request != null ? request.getRemoteAddr() : null;
-		Map<String, String> queryParams = new HashMap<>();
-		if (request != null && request.getParameterMap() != null) {
-			for (Map.Entry<String, String[]> e : request.getParameterMap().entrySet()) {
-				if (e.getValue() != null && e.getValue().length > 0)
-					queryParams.put(e.getKey(), e.getValue()[0]);
-			}
-		}
-		return WebhookInboundHandler.handle(endpointKey, body, queryParams, headers, remoteAddr);
+	private String email;
+	private String code;
+
+	public PasswordResetVerification() {
 	}
+
+	public String getEmail() {
+		return email;
+	}
+
+	public void setEmail(String email) {
+		this.email = email;
+	}
+
+	public String getCode() {
+		return code;
+	}
+
+	public void setCode(String code) {
+		this.code = code;
+	}
+
 }

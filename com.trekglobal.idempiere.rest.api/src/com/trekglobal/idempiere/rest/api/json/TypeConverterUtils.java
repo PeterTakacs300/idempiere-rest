@@ -46,8 +46,10 @@ import java.util.regex.Pattern;
 import org.adempiere.base.Service;
 import org.adempiere.base.ServiceQuery;
 import org.compiere.model.GridField;
+import org.compiere.model.Lookup;
 import org.compiere.model.MColumn;
 import org.compiere.util.DisplayType;
+import org.compiere.util.NamePair;
 import org.compiere.util.Util;
 
 import com.google.gson.JsonElement;
@@ -94,10 +96,9 @@ public class TypeConverterUtils {
 	 * @return Object
 	 */
 	public static Object toJsonValue(MColumn column, Object value) {
-		return toJsonValue(column, value, null);
+		return toJsonValue(column, value, null, null);
 	}
-	
-	@SuppressWarnings({ "rawtypes", "unchecked" })
+
 	/**
 	 * Convert db column value to json value
 	 * @param column
@@ -105,11 +106,24 @@ public class TypeConverterUtils {
 	 * @param referenceView
 	 * @return Object
 	 */
-	public static Object toJsonValue(MColumn column, Object value, MRestView referenceView) {		
+	public static Object toJsonValue(MColumn column, Object value, MRestView referenceView) {
+		return toJsonValue(column, value, referenceView, null);
+	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	/**
+	 * Convert db column value to json value within the given transaction
+	 * @param column
+	 * @param value
+	 * @param referenceView
+	 * @param trxName transaction name, or null to read committed data
+	 * @return Object
+	 */
+	public static Object toJsonValue(MColumn column, Object value, MRestView referenceView, String trxName) {
 		ITypeConverter typeConverter = getTypeConverter(column.getAD_Reference_ID(), value);
-		
+
 		if (typeConverter != null) {
-			return typeConverter.toJsonValue(column, value, referenceView);
+			return typeConverter.toJsonValue(column, value, referenceView, trxName);
 		} else if (value != null && DisplayType.isText(column.getAD_Reference_ID())) {
 			return value.toString();
 		} else if (value != null && column.getAD_Reference_ID() == DisplayType.ID && value instanceof Number) {
@@ -118,19 +132,30 @@ public class TypeConverterUtils {
 			return null;
 		}
 	}
-	
-	@SuppressWarnings({ "rawtypes", "unchecked" })
+
 	/**
 	 * Convert db column value to json value
 	 * @param field
 	 * @param value
 	 * @return Object
 	 */
-	public static Object toJsonValue(GridField field, Object value) {		
+	public static Object toJsonValue(GridField field, Object value) {
+		return toJsonValue(field, value, (String)null);
+	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	/**
+	 * Convert db column value to json value within the given transaction
+	 * @param field
+	 * @param value
+	 * @param trxName transaction name, or null to read committed data
+	 * @return Object
+	 */
+	public static Object toJsonValue(GridField field, Object value, String trxName) {
 		ITypeConverter typeConverter = getTypeConverter(field.getDisplayType(), value);
-		
+
 		if (typeConverter != null) {
-			return typeConverter.toJsonValue(field, value);
+			return typeConverter.toJsonValue(field, value, trxName);
 		} else if (value != null && DisplayType.isText(field.getDisplayType())) {
 			return value.toString();
 		} else if (value != null && field.getDisplayType() == DisplayType.ID && value instanceof Number) {
@@ -139,7 +164,7 @@ public class TypeConverterUtils {
 			return null;
 		}
 	}
-	
+
 	/**
 	 * Convert json value to db column value
 	 * @param column
@@ -147,10 +172,9 @@ public class TypeConverterUtils {
 	 * @return Object
 	 */
 	public static Object fromJsonValue(MColumn column, JsonElement value) {
-		return fromJsonValue(column, value, null);
+		return fromJsonValue(column, value, null, null);
 	}
-	
-	@SuppressWarnings("rawtypes")
+
 	/**
 	 * Convert json value to db column value
 	 * @param column
@@ -158,30 +182,54 @@ public class TypeConverterUtils {
 	 * @param referenceView
 	 * @return Object
 	 */
-	public static Object fromJsonValue(MColumn column, JsonElement value, MRestView referenceView) {		
+	public static Object fromJsonValue(MColumn column, JsonElement value, MRestView referenceView) {
+		return fromJsonValue(column, value, referenceView, null);
+	}
+
+	@SuppressWarnings("rawtypes")
+	/**
+	 * Convert json value to db column value within the given transaction
+	 * @param column
+	 * @param value
+	 * @param referenceView
+	 * @param trxName transaction name, or null for auto-commit
+	 * @return Object
+	 */
+	public static Object fromJsonValue(MColumn column, JsonElement value, MRestView referenceView, String trxName) {
 		ITypeConverter typeConverter = getTypeConverter(column.getAD_Reference_ID(), value);
-		
+
 		if (typeConverter != null) {
-			return typeConverter.fromJsonValue(column, value, referenceView);
+			return typeConverter.fromJsonValue(column, value, referenceView, trxName);
 		} else if (value != null && !(value instanceof JsonNull) && DisplayType.isText(column.getAD_Reference_ID())) {
 			return value.getAsString();
 		} else {
 			return null;
 		}
 	}
-	
-	@SuppressWarnings("rawtypes")
+
 	/**
 	 * Convert json value to db column value
 	 * @param gridField
 	 * @param value
 	 * @return Object
 	 */
-	public static Object fromJsonValue(GridField gridField, JsonElement value) {		
+	public static Object fromJsonValue(GridField gridField, JsonElement value) {
+		return fromJsonValue(gridField, value, (String)null);
+	}
+
+	@SuppressWarnings("rawtypes")
+	/**
+	 * Convert json value to db column value within the given transaction
+	 * @param gridField
+	 * @param value
+	 * @param trxName transaction name, or null for auto-commit
+	 * @return Object
+	 */
+	public static Object fromJsonValue(GridField gridField, JsonElement value, String trxName) {
 		ITypeConverter typeConverter = getTypeConverter(gridField.getDisplayType(), value);
-		
+
 		if (typeConverter != null) {
-			return typeConverter.fromJsonValue(gridField, value);
+			return typeConverter.fromJsonValue(gridField, value, trxName);
 		} else if (value != null && !(value instanceof JsonNull) && DisplayType.isText(gridField.getDisplayType())) {
 			return value.getAsString();
 		} else {
@@ -190,11 +238,31 @@ public class TypeConverterUtils {
 	}
 	
 	/**
+	 * Resolve the display identifier for a lookup value within the given transaction.
+	 * <p>Uses {@link Lookup#getDirect(Object, boolean, boolean, String)} so a referenced row
+	 * co-created earlier in the same still-open request transaction is visible, and falls back
+	 * to the cached {@link Lookup#getDisplay(Object)} when no transaction is supplied or the
+	 * direct read returns nothing.
+	 * @param lookup lookup
+	 * @param value key value
+	 * @param trxName transaction name, or null to read committed data
+	 * @return display identifier
+	 */
+	public static String getIdentifier(Lookup lookup, Object value, String trxName) {
+		if (trxName != null) {
+			NamePair pair = lookup.getDirect(value, false, false, trxName);
+			if (pair != null)
+				return pair.getName();
+		}
+		return lookup.getDisplay(value);
+	}
+
+	/**
 	 * convert arbitrary text to slug
 	 * @param input
 	 * @return slug
 	 */
-	public static String slugify(String input) {  
+	public static String slugify(String input) {
 		String noseparators = SEPARATORS.matcher(input).replaceAll("-");
 	    String normalized = Normalizer.normalize(noseparators, Form.NFD);
 	    String slug = NONLATIN.matcher(normalized).replaceAll("");

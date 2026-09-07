@@ -20,39 +20,38 @@
 * MA 02110-1301, USA.                                                 *
 *                                                                     *
 * Contributors:                                                       *
-* - Trek Global Corporation                                           *
-* - Murilo Torino                                                     *
+* - Diego Ruiz - bx-service                                           *
 **********************************************************************/
-package com.trekglobal.idempiere.rest.api.v1.resource.impl;
-
-import java.util.HashMap;
-import java.util.Map;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.Response;
-
-import com.trekglobal.idempiere.rest.api.v1.resource.WebhookInboundResource;
-import com.trekglobal.idempiere.rest.api.webhook.WebhookInboundHandler;
+package com.trekglobal.idempiere.rest.api.v1.auth;
 
 /**
- * Implementation of inbound webhook endpoint.
- * Delegates all logic to WebhookInboundHandler.
+ * Body of the third step of the code-based password reset (IDEMPIERE-7060): set
+ * the new password using the verified token returned by the verify step.
  *
- * @author muriloht Murilo H. Torquato &lt;murilo@muriloht.com&gt;
+ * @author Diego Ruiz
  */
-public class WebhookInboundResourceImpl implements WebhookInboundResource {
+public class PasswordResetCompletion {
 
-	@Override
-	public Response receiveWebhook(String endpointKey, String body, HttpHeaders headers, HttpServletRequest request) {
-		String remoteAddr = request != null ? request.getRemoteAddr() : null;
-		Map<String, String> queryParams = new HashMap<>();
-		if (request != null && request.getParameterMap() != null) {
-			for (Map.Entry<String, String[]> e : request.getParameterMap().entrySet()) {
-				if (e.getValue() != null && e.getValue().length > 0)
-					queryParams.put(e.getKey(), e.getValue()[0]);
-			}
-		}
-		return WebhookInboundHandler.handle(endpointKey, body, queryParams, headers, remoteAddr);
+	private String verifiedToken;
+	private String newPassword;
+
+	public PasswordResetCompletion() {
 	}
+
+	public String getVerifiedToken() {
+		return verifiedToken;
+	}
+
+	public void setVerifiedToken(String verifiedToken) {
+		this.verifiedToken = verifiedToken;
+	}
+
+	public String getNewPassword() {
+		return newPassword;
+	}
+
+	public void setNewPassword(String newPassword) {
+		this.newPassword = newPassword;
+	}
+
 }
